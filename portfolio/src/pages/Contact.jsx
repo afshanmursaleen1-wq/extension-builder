@@ -160,7 +160,7 @@ export default function Contact() {
             {/* Right Column - Form */}
             <motion.div
               {...fadeInUp}
-              transition={{ delay: 0.2 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
               className="lg:col-span-3"
             >
               <form onSubmit={handleSubmit} className="glass-card p-6 md:p-8 rounded-2xl">

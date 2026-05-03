@@ -261,7 +261,7 @@ export default function Home() {
               <motion.div
                 key={i}
                 {...fadeInUp}
-                transition={{ delay: i * 0.08 }}
+                transition={{ duration: 0.6, delay: i * 0.08 }}
                 className="glass-card-hover p-6 text-center rounded-xl"
               >
                 <tool.icon className="mx-auto mb-3 text-primary-400" size={32} />
@@ -285,7 +285,7 @@ export default function Home() {
               <motion.div
                 key={i}
                 {...fadeInUp}
-                transition={{ delay: i * 0.1 }}
+                transition={{ duration: 0.6, delay: i * 0.1 }}
                 className="glass-card-hover p-6 md:p-8 rounded-2xl group"
               >
                 <div className="w-12 h-12 rounded-xl bg-primary-500/10 border border-primary-500/20 flex items-center justify-center mb-4 group-hover:bg-primary-500/20 transition-colors">
@@ -318,7 +318,7 @@ export default function Home() {
               <motion.div
                 key={i}
                 {...fadeInUp}
-                transition={{ delay: i * 0.15 }}
+                transition={{ duration: 0.6, delay: i * 0.15 }}
                 className="glass-card p-6 md:p-8 rounded-2xl"
               >
                 <div className="flex gap-1 mb-4">

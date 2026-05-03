@@ -209,7 +209,7 @@ export default function Services() {
               <motion.div
                 key={i}
                 {...fadeInUp}
-                transition={{ delay: i * 0.1 }}
+                transition={{ duration: 0.6, delay: i * 0.1 }}
                 className="glass-card-hover p-6 md:p-8 rounded-2xl group"
               >
                 <div className="w-14 h-14 rounded-xl bg-primary-500/10 border border-primary-500/20 flex items-center justify-center mb-5 group-hover:bg-primary-500/20 transition-colors">
@@ -244,7 +244,7 @@ export default function Services() {
               <motion.div
                 key={i}
                 {...fadeInUp}
-                transition={{ delay: i * 0.1 }}
+                transition={{ duration: 0.6, delay: i * 0.1 }}
                 className="text-center"
               >
                 <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-primary-500/10 border border-primary-500/20 flex items-center justify-center relative">
@@ -274,7 +274,7 @@ export default function Services() {
               <motion.div
                 key={i}
                 {...fadeInUp}
-                transition={{ delay: i * 0.15 }}
+                transition={{ duration: 0.6, delay: i * 0.15 }}
                 className={`rounded-2xl p-6 md:p-8 relative ${
                   pkg.highlighted
                     ? 'bg-gradient-to-b from-primary-900/40 to-dark-500 border-2 border-primary-500/40 shadow-lg shadow-primary-500/10'

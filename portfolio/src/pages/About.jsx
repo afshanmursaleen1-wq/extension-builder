@@ -160,7 +160,7 @@ export default function About() {
               <motion.div
                 key={i}
                 {...fadeInUp}
-                transition={{ delay: i * 0.1 }}
+                transition={{ duration: 0.6, delay: i * 0.1 }}
                 className="glass-card p-5 rounded-xl"
               >
                 <div className="flex items-center justify-between mb-3">
@@ -198,7 +198,7 @@ export default function About() {
               <motion.div
                 key={i}
                 {...fadeInUp}
-                transition={{ delay: i * 0.15 }}
+                transition={{ duration: 0.6, delay: i * 0.15 }}
                 className="relative pl-8 md:pl-12"
               >
                 <div className="absolute left-0 top-0 w-8 h-8 rounded-full bg-primary-500/20 border border-primary-500/40 flex items-center justify-center">
