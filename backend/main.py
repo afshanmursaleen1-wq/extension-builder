@@ -1,6 +1,7 @@
 """Chrome Extension Builder - FastAPI Backend."""
 
 import uuid
+from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -60,6 +61,9 @@ async def upload_image(file: UploadFile = File(...)):
 
     file_id = str(uuid.uuid4())
     ext = file.filename.rsplit(".", 1)[-1] if file.filename and "." in file.filename else "png"
+    ext = ext.replace("/", "").replace("\\", "").replace("..", "")[:10]
+    if not ext.isalnum():
+        ext = "png"
     save_path = UPLOAD_DIR / f"{file_id}.{ext}"
 
     content = await file.read()
@@ -74,6 +78,9 @@ async def generate_extension(
     website_url: str = Form(""),
     mode: str = Form("prompt"),
     image_paths: str = Form(""),
+    html_code: str = Form(""),
+    css_code: str = Form(""),
+    js_code: str = Form(""),
 ):
     """Generate a Chrome extension from a prompt, with optional images and URL."""
     if not OPENAI_API_KEY:
@@ -94,6 +101,10 @@ async def generate_extension(
         if image_paths
         else []
     )
+    img_list = [
+        p for p in img_list
+        if Path(p).resolve().is_relative_to(UPLOAD_DIR.resolve())
+    ]
 
     try:
         if mode == "clone":
@@ -101,6 +112,9 @@ async def generate_extension(
                 website_url=website_url,
                 prompt=prompt,
                 image_paths=img_list if img_list else None,
+                html_code=html_code,
+                css_code=css_code,
+                js_code=js_code,
             )
         else:
             result = await generate_from_prompt(
@@ -207,8 +221,6 @@ async def download_extension(task_id: str):
     if not zip_path:
         raise HTTPException(status_code=404, detail="ZIP file not found")
 
-    from pathlib import Path
-
     if not Path(zip_path).exists():
         raise HTTPException(status_code=404, detail="ZIP file no longer exists")
 
@@ -226,4 +238,4 @@ async def get_task_status(task_id: str):
     task = tasks.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    return task
+    return {k: v for k, v in task.items() if k != "zip_path"}

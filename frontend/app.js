@@ -224,6 +224,9 @@ async function generateClone() {
     formData.append('website_url', url);
     formData.append('mode', 'clone');
     formData.append('image_paths', images.join(','));
+    formData.append('html_code', html);
+    formData.append('css_code', css);
+    formData.append('js_code', js);
 
     const res = await fetch('/api/generate', { method: 'POST', body: formData });
     const data = await res.json();
