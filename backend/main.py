@@ -28,6 +28,7 @@ app.add_middleware(
 
 # Store tasks in memory (for production, use a database)
 tasks: dict[str, dict] = {}
+uploaded_images: dict[str, str] = {}
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -69,7 +70,9 @@ async def upload_image(file: UploadFile = File(...)):
     content = await file.read()
     save_path.write_bytes(content)
 
-    return {"image_id": file_id, "path": str(save_path), "filename": file.filename}
+    uploaded_images[file_id] = str(save_path)
+
+    return {"image_id": file_id, "filename": file.filename}
 
 
 @app.post("/api/generate")
@@ -89,21 +92,26 @@ async def generate_extension(
             detail="OpenAI API key not configured. Set OPENAI_API_KEY environment variable.",
         )
 
-    if not prompt and not website_url and not image_paths:
+    has_input = (
+        prompt or website_url or image_paths
+        or html_code or css_code or js_code
+    )
+    if not has_input:
         raise HTTPException(
             status_code=400,
-            detail="Please provide a prompt, URL, or upload images",
+            detail="Please provide a prompt, URL, images, or code",
         )
 
     task_id = str(uuid.uuid4())
-    img_list = (
+    img_ids = (
         [p.strip() for p in image_paths.split(",") if p.strip()]
         if image_paths
         else []
     )
     img_list = [
-        p for p in img_list
-        if Path(p).resolve().is_relative_to(UPLOAD_DIR.resolve())
+        uploaded_images[img_id]
+        for img_id in img_ids
+        if img_id in uploaded_images
     ]
 
     try:

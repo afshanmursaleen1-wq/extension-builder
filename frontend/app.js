@@ -68,7 +68,7 @@ async function handleFiles(files, mode, previewContainer) {
       if (!res.ok) throw new Error('Upload failed');
 
       const data = await res.json();
-      uploadedImages[mode].push(data.path);
+      uploadedImages[mode].push(data.image_id);
 
       const item = document.createElement('div');
       item.className = 'preview-item';
@@ -81,7 +81,7 @@ async function handleFiles(files, mode, previewContainer) {
       btn.textContent = '\u00D7';
       btn.onclick = (e) => {
         e.stopPropagation();
-        const idx = uploadedImages[mode].indexOf(data.path);
+        const idx = uploadedImages[mode].indexOf(data.image_id);
         if (idx > -1) uploadedImages[mode].splice(idx, 1);
         item.remove();
       };
