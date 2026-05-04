@@ -98,8 +98,27 @@
           ]
         },
         "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"topic\": {{ JSON.stringify($json.Idea) }},\n  \"audience\": \"business owners and agencies interested in AI automation\",\n  \"tone\": \"Expert\",\n  \"wordCount\": 1200\n}",
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "topic",
+              "value": "={{ $json.idea }}"
+            },
+            {
+              "name": "audience",
+              "value": "business owners and agencies interested in AI automation"
+            },
+            {
+              "name": "tone",
+              "value": "Expert"
+            },
+            {
+              "name": "wordCount",
+              "value": "={{1200}}"
+            }
+          ]
+        },
         "options": {
           "response": {
             "response": {
@@ -116,7 +135,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Parse SSE stream response from RankReady /api/generate\n// Each line is: data: {\"type\":\"text\",\"delta\":\"...\",\"wordCount\":N}\n\nconst rawText = $input.first().json.data || $input.first().json.body || '';\nconst idea = $('Limit to 1').first().json.Idea;\n\nconst lines = rawText.split('\\n').filter(l => l.startsWith('data: '));\nlet fullContent = '';\nlet wordCount = 0;\n\nfor (const line of lines) {\n  try {\n    const data = JSON.parse(line.substring(6));\n    if (data.delta) fullContent += data.delta;\n    if (data.wordCount) wordCount = data.wordCount;\n  } catch (e) {\n    // skip malformed lines\n  }\n}\n\nif (!fullContent) {\n  throw new Error('RankReady returned empty content. Raw response: ' + rawText.substring(0, 200));\n}\n\n// Extract title from the first <h1> tag\nconst titleMatch = fullContent.match(/<h1[^>]*>(.*?)<\\/h1>/i);\nconst title = titleMatch ? titleMatch[1].replace(/<[^>]*>/g, '').trim() : idea;\n\n// Generate URL slug from title\nconst slug = title\n  .toLowerCase()\n  .replace(/[^a-z0-9\\s-]/g, '')\n  .replace(/\\s+/g, '-')\n  .replace(/-+/g, '-')\n  .substring(0, 80);\n\nreturn [{\n  json: {\n    content: fullContent,\n    title: title,\n    slug: slug,\n    wordCount: wordCount,\n    topic: idea\n  }\n}];"
+        "jsCode": "// Parse SSE stream response from RankReady /api/generate\n// Each line is: data: {\"type\":\"text\",\"delta\":\"...\",\"wordCount\":N}\n\nconst rawText = $input.first().json.data || $input.first().json.body || '';\nconst idea = $('Limit to 1').first().json.idea || $('Limit to 1').first().json.Idea;\n\nconst lines = rawText.split('\\n').filter(l => l.startsWith('data: '));\nlet fullContent = '';\nlet wordCount = 0;\n\nfor (const line of lines) {\n  try {\n    const data = JSON.parse(line.substring(6));\n    if (data.delta) fullContent += data.delta;\n    if (data.wordCount) wordCount = data.wordCount;\n  } catch (e) {\n    // skip malformed lines\n  }\n}\n\nif (!fullContent) {\n  throw new Error('RankReady returned empty content. Raw response: ' + rawText.substring(0, 200));\n}\n\n// Extract title from the first <h1> tag\nconst titleMatch = fullContent.match(/<h1[^>]*>(.*?)<\\/h1>/i);\nconst title = titleMatch ? titleMatch[1].replace(/<[^>]*>/g, '').trim() : idea;\n\n// Generate URL slug from title\nconst slug = title\n  .toLowerCase()\n  .replace(/[^a-z0-9\\s-]/g, '')\n  .replace(/\\s+/g, '-')\n  .replace(/-+/g, '-')\n  .substring(0, 80);\n\nreturn [{\n  json: {\n    content: fullContent,\n    title: title,\n    slug: slug,\n    wordCount: wordCount,\n    topic: idea\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
