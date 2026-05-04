@@ -370,7 +370,7 @@
     },
     {
       "parameters": {
-        "jsCode": "function extractMedia(obj) {\n  if (!obj) return [];\n  if (Array.isArray(obj)) return obj.flatMap(extractMedia);\n  if (obj.media && Array.isArray(obj.media)) return obj.media;\n  return Object.values(obj).flatMap(extractMedia);\n}\n\nlet allMedia = [];\nfor (const item of items) {\n  const found = extractMedia(item.json);\n  allMedia.push(...found);\n}\n\nconst unique = [];\nconst seen = new Set();\nfor (const media of allMedia) {\n  if (!media?.image?.generatedImage?.fifeUrl) continue;\n  if (!seen.has(media.name)) {\n    seen.add(media.name);\n    unique.push(media);\n  }\n}\n\nreturn unique.map(media => ({\n  json: {\n    mediaId: media.name || null,\n    prompt: media.image?.generatedImage?.prompt || null,\n    url: media.image?.generatedImage?.fifeUrl || null\n  }\n}));"
+        "jsCode": "function extractMedia(obj) {\n  if (!obj || typeof obj !== 'object') return [];\n  if (Array.isArray(obj)) return obj.flatMap(extractMedia);\n  if (obj.media && Array.isArray(obj.media)) return obj.media;\n  return Object.values(obj).flatMap(extractMedia);\n}\n\nlet allMedia = [];\nfor (const item of items) {\n  const found = extractMedia(item.json);\n  allMedia.push(...found);\n}\n\nconst unique = [];\nconst seen = new Set();\nfor (const media of allMedia) {\n  if (!media?.image?.generatedImage?.fifeUrl) continue;\n  if (!seen.has(media.name)) {\n    seen.add(media.name);\n    unique.push(media);\n  }\n}\n\nreturn unique.map(media => ({\n  json: {\n    mediaId: media.name || null,\n    prompt: media.image?.generatedImage?.prompt || null,\n    url: media.image?.generatedImage?.fifeUrl || null\n  }\n}));"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
