@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AutoMind Text Summarizer</title>
+  <link rel="stylesheet" href="sidepanel.css" />
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="header-brand">
+      <img src="../icons/icon48.png" alt="AutoMind" class="header-logo" />
+      <h1>AutoMind</h1>
+    </div>
+    <button id="settings-toggle" class="icon-btn" title="Settings">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    </button>
+  </header>
+
+  <!-- Settings Panel (hidden by default) -->
+  <section id="settings-panel" class="settings-panel hidden">
+    <label for="api-key-input">Google Gemini API Key (free)</label>
+    <div class="input-row">
+      <input type="password" id="api-key-input" placeholder="Paste your Gemini API key" />
+      <button id="save-key-btn" class="btn btn-primary">Save</button>
+    </div>
+    <p class="hint">
+      Get a free key at
+      <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">
+        aistudio.google.com/apikey
+      </a>
+    </p>
+    <div id="key-status" class="key-status"></div>
+  </section>
+
+  <!-- Main content area -->
+  <main id="main-content">
+    <!-- Empty state -->
+    <section id="empty-state" class="empty-state">
+      <div class="empty-icon">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#6c3bff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+          <polyline points="10 9 9 9 8 9"/>
+        </svg>
+      </div>
+      <h2>Select text to summarize</h2>
+      <p>Highlight any text on a webpage and click the <strong>"Summarize"</strong> button that appears, or right-click and choose <strong>"Summarize with AutoMind"</strong>.</p>
+    </section>
+
+    <!-- Loading state -->
+    <section id="loading-state" class="loading-state hidden">
+      <div class="spinner"></div>
+      <p>Summarizing...</p>
+    </section>
+
+    <!-- Result state -->
+    <section id="result-state" class="result-state hidden">
+      <h3>Summary</h3>
+      <div id="summary-content" class="summary-content"></div>
+
+      <details class="original-text">
+        <summary>Show original text</summary>
+        <div id="original-content" class="original-content"></div>
+      </details>
+
+      <div class="action-row">
+        <button id="copy-btn" class="btn btn-outline">Copy Summary</button>
+      </div>
+    </section>
+
+    <!-- Error state -->
+    <section id="error-state" class="error-state hidden">
+      <p id="error-message" class="error-message"></p>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <span>AutoMind AI &mdash; Free forever</span>
+  </footer>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>
