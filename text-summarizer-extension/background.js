@@ -45,10 +45,13 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "SUMMARIZE_TEXT") {
-    if (sender.tab?.id) {
-      chrome.sidePanel.open({ tabId: sender.tab.id });
-    }
-    handleSummarize(message.text);
+    const openAndSummarize = async () => {
+      if (sender.tab?.id) {
+        await chrome.sidePanel.open({ tabId: sender.tab.id });
+      }
+      await handleSummarize(message.text);
+    };
+    openAndSummarize();
     sendResponse({ status: "processing" });
   }
 
