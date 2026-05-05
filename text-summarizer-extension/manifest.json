@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "AutoMind Text Summarizer",
+  "description": "Select any text on a webpage and get an instant AI-powered summary in the side panel. Free forever, powered by Google Gemini.",
+  "version": "1.0.0",
+  "author": "automindai",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": [
+    "sidePanel",
+    "activeTab",
+    "storage",
+    "contextMenus"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "side_panel": {
+    "default_path": "sidepanel/sidepanel.html"
+  },
+  "action": {
+    "default_title": "AutoMind Text Summarizer"
+  }
+}
