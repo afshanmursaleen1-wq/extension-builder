@@ -1,0 +1,861 @@
+{
+  "name": "Content Pipeline — RankReady Integration",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [272, 208],
+      "id": "0f31faf5-e796-4772-b364-08a20bd9de62",
+      "name": "Daily"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Blog Ideas",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [448, 208],
+      "id": "abc910d0-2109-4b88-b3ea-199333d04e09",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "3b2b5c58-a10f-4605-96ea-7fe5341d081d",
+              "leftValue": "={{ $json.Status }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [624, 208],
+      "id": "0825ab27-fe43-4eae-a5fa-d54e97ae2aec",
+      "name": "If Status Empty"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [800, 192],
+      "id": "8ea4bb14-060b-4084-98fd-f6b603343a05",
+      "name": "Limit to 1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://rank-ready-sag.lovable.app/api/generate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "topic",
+              "value": "={{ $json.idea }}"
+            },
+            {
+              "name": "audience",
+              "value": "business owners and agencies interested in AI automation"
+            },
+            {
+              "name": "tone",
+              "value": "Expert"
+            },
+            {
+              "name": "wordCount",
+              "value": "={{1200}}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [976, 192],
+      "id": "rankready-generate-001",
+      "name": "RankReady — Call API"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse SSE stream response from RankReady /api/generate\n// Each line is: data: {\"type\":\"text\",\"delta\":\"...\",\"wordCount\":N}\n\nconst rawText = $input.first().json.data || $input.first().json.body || '';\nconst idea = $('Limit to 1').first().json.idea || $('Limit to 1').first().json.Idea;\n\nconst lines = rawText.split('\\n').filter(l => l.startsWith('data: '));\nlet fullContent = '';\nlet wordCount = 0;\n\nfor (const line of lines) {\n  try {\n    const data = JSON.parse(line.substring(6));\n    if (data.delta) fullContent += data.delta;\n    if (data.wordCount) wordCount = data.wordCount;\n  } catch (e) {\n    // skip malformed lines\n  }\n}\n\nif (!fullContent) {\n  throw new Error('RankReady returned empty content. Raw response: ' + rawText.substring(0, 200));\n}\n\n// Extract title from the first <h1> tag\nconst titleMatch = fullContent.match(/<h1[^>]*>(.*?)<\\/h1>/i);\nconst title = titleMatch ? titleMatch[1].replace(/<[^>]*>/g, '').trim() : idea;\n\n// Generate URL slug from title\nconst slug = title\n  .toLowerCase()\n  .replace(/[^a-z0-9\\s-]/g, '')\n  .replace(/\\s+/g, '-')\n  .replace(/-+/g, '-')\n  .substring(0, 80);\n\nreturn [{\n  json: {\n    content: fullContent,\n    title: title,\n    slug: slug,\n    wordCount: wordCount,\n    topic: idea\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1064, 192],
+      "id": "rankready-parse-sse-001",
+      "name": "RankReady — Parse Response"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://YOUR_WORDPRESS_SITE/wp-json/wp/v2/posts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"title\": {{ JSON.stringify($json.title) }},\n  \"content\": {{ JSON.stringify($json.content) }},\n  \"slug\": {{ JSON.stringify($json.slug) }},\n  \"status\": \"draft\",\n  \"format\": \"standard\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1152, 192],
+      "id": "rankready-wp-create-001",
+      "name": "Create WordPress Draft",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "YOUR_WP_BASIC_AUTH_CREDENTIAL_ID",
+          "name": "WordPress Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse WordPress response and prepare data for downstream nodes\n// This replaces the original Parse1 node\n\nconst wpResponse = $input.first().json;\nconst generateData = $('RankReady — Parse Response').first().json;\n\nconst postId = wpResponse.id;\nconst postUrl = wpResponse.link || `https://YOUR_WORDPRESS_SITE/?p=${postId}`;\n\n// Generate a 3-line summary from the content\nconst content = generateData.content || '';\nconst plainText = content.replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();\nconst sentences = plainText.split(/[.!?]+/).filter(s => s.trim().length > 20);\n\nconst summaryLines = [];\nif (sentences.length >= 3) {\n  summaryLines.push(sentences[0].trim());\n  summaryLines.push(sentences[Math.floor(sentences.length / 2)].trim());\n  summaryLines.push(sentences[sentences.length - 1].trim());\n} else {\n  summaryLines.push(generateData.topic);\n  summaryLines.push(plainText.substring(0, 150));\n  summaryLines.push(`${generateData.wordCount} words generated via RankReady`);\n}\n\nreturn [{\n  json: {\n    summary: summaryLines.join(' | '),\n    post: {\n      post_id: postId,\n      post_url: postUrl\n    },\n    status: 'success',\n    title: generateData.title,\n    slug: generateData.slug,\n    wordCount: generateData.wordCount\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1328, 192],
+      "id": "rankready-parse-001",
+      "name": "Parse Pipeline Data"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://rank-ready-sag.lovable.app/api/analyze",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"content\": {{ JSON.stringify($('RankReady — Parse Response').first().json.content) }},\n  \"keyword\": {{ JSON.stringify($('RankReady — Parse Response').first().json.topic) }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1504, 400],
+      "id": "rankready-analyze-001",
+      "name": "RankReady — Analyze SEO"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://integrate.api.nvidia.com/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "text/event-stream"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "=\n{\n  \"model\": \"moonshotai/kimi-k2.5\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"You are a specialized Mermaid.js diagram expert for the content pipeline. Your task is to transform the idea below into a production-ready, high-contrast Mermaid.js flowchart.\\n\\n### STRICT SYNTAX RULES (violations will break the renderer):\\n- Start the output IMMEDIATELY with 'graph TD' — no leading spaces, no blank lines before it\\n- Do NOT use markdown code fences (no ```mermaid or ``` anywhere)\\n- Do NOT add any text before or after the Mermaid code\\n- NEVER use parentheses () inside node labels — use dashes instead\\n- NEVER use square brackets [] inside node labels\\n- NEVER use curly braces {} inside node labels\\n- NEVER use angle brackets <> inside node labels\\n- Node IDs must be single words with no spaces\\n- Stadium shapes must use this exact format: NodeId([label text])\\n\\n### STYLE RULES:\\n- Include a %%{init}%% theme block at the top for dark high-contrast styling\\n- Use classDef to style nodes by category\\n- MUST include a Unicode emoji at the start of every single node label\\n- Use subgraphs to group related phases\\n\\n### Output Requirements:\\n- Output ONLY the raw Mermaid code\\n- No preamble, no explanation, no markdown\\n\\nHere is the Idea/summary:{{ $json.summary }}\"\n    }\n  ],\n  \"max_tokens\": 16384,\n  \"temperature\": 0.7,\n  \"top_p\": 1,\n  \"stream\": false,\n  \"chat_template_kwargs\": {\n    \"thinking\": true\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1504, 192],
+      "id": "a6fc98dd-b144-4115-ac31-bed4bb07884d",
+      "name": "LLM - Mermaid JS",
+      "retryOnFail": true,
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "YOUR_NVIDIA_BEARER_AUTH_ID",
+          "name": "Nvidia Bearer Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.choices[0].message.content;\n\nconst diagram = raw\n  .trim()\n  .replace(/\\(([^\\[\\]()]+)\\)/g, '- $1');\n\nconst encoded = Buffer.from(diagram)\n  .toString('base64')\n  .replace(/\\+/g, '-')\n  .replace(/\\//g, '_')\n  .replace(/=/g, '');\n\nreturn [{ json: { encoded } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1680, 192],
+      "id": "49699653-386a-403d-bc67-94a85630a888",
+      "name": "Mermaid to Base64"
+    },
+    {
+      "parameters": {
+        "url": "=https://mermaid.ink/img/{{ $json.encoded }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1856, 192],
+      "id": "2f4d07d5-e4f0-450d-82d9-b8d38cdf891f",
+      "name": "Render Diagram",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://YOUR_WORDPRESS_SITE/wp-json/wp/v2/media",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Disposition",
+              "value": "attachment; filename=\"diagram.png\""
+            },
+            {
+              "name": "Content-Type",
+              "value": "image/png"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "name": "Upload Diagram to WP",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2032, 192],
+      "id": "11b46463-184e-47fd-b862-759397951d56",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "YOUR_WP_BASIC_AUTH_CREDENTIAL_ID",
+          "name": "WordPress Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://YOUR_WORDPRESS_SITE/wp-json/wp/v2/posts/{{ $('Parse Pipeline Data').item.json.post.post_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "options": {}
+      },
+      "name": "Get Post Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2208, 192],
+      "id": "7a25f3bc-6de4-4960-9065-9be6a1f5fb11",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "YOUR_WP_BASIC_AUTH_CREDENTIAL_ID",
+          "name": "WordPress Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const postData = $('Get Post Content').first().json;\nconst uploadData = $('Upload Diagram to WP').first().json;\n\nif (!postData) throw new Error('Get Post Content node returned nothing');\nif (!uploadData) throw new Error('Upload Diagram to WP node returned nothing');\n\nconst existingContent = postData.content.rendered;\nconst imageUrl = uploadData.source_url;\nconst imageId = uploadData.id;\n\nif (!existingContent) throw new Error('content.rendered is empty');\nif (!imageUrl) throw new Error('source_url is empty');\n\nconst imageHtml = `\\n<figure class=\"wp-block-image size-full\">\\n  <img src=\"${imageUrl}\" alt=\"blog diagram\" class=\"wp-image-${imageId}\" style=\"max-width:100%;height:auto;\" />\\n</figure>`;\n\nconst updatedContent = existingContent + imageHtml;\n\nreturn [{ json: { updatedContent } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2384, 192],
+      "id": "c7adbf76-5678-4294-9ae5-0d032ae58fbb",
+      "name": "Append Diagram to Post"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://YOUR_WORDPRESS_SITE/wp-json/wp/v2/posts/{{ $('Parse Pipeline Data').item.json.post.post_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "={{ $json.updatedContent }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Update Post with Diagram",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2560, 192],
+      "id": "572970c2-4b78-482b-a575-f6f6afc0e4b0",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "YOUR_WP_BASIC_AUTH_CREDENTIAL_ID",
+          "name": "WordPress Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://integrate.api.nvidia.com/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "text/event-stream"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"moonshotai/kimi-k2.5\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"You are a specialized prompt engineer for AI image generation models. Write one single image generation prompt — no explanation, no options, no commentary.\\n\\nThe image is a WordPress blog post featured image (hero image). Follow these rules:\\n\\nSTYLE: Flat design, bright vivid colors, contrasting palettes, clean minimalist, professional tech blog.\\nNO text, NO words, NO labels, NO people, NO faces.\\n\\nCOMPOSITION: Show relevant tech icons as flat illustrations, central focal element, supporting geometric shapes, 1200x630px landscape.\\n\\nQUALITY KEYWORDS: flat illustration, vector art style, vibrant colors, sharp edges, high contrast, professional tech blog hero image, no text, no typography, clean background, 8k quality\\n\\nBLOG TOPIC SUMMARY:\\n{{ $('Parse Pipeline Data').item.json.summary }}\\n\\nNow write the image generation prompt:\"\n    }\n  ],\n  \"max_tokens\": 16934,\n  \"temperature\": 0.7,\n  \"top_p\": 1,\n  \"stream\": false\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [2736, 192],
+      "id": "0dc422b4-4749-49b0-aab2-41fd2b015a0e",
+      "name": "LLM - Featured Image Prompt",
+      "retryOnFail": true,
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "YOUR_NVIDIA_BEARER_AUTH_ID",
+          "name": "Nvidia Bearer Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "YOUR_IMAGE_GENERATION_API_URL",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "prompt",
+              "value": "={{ $json.choices[0].message.content }}"
+            },
+            {
+              "name": "aspect_ratio",
+              "value": "landscape"
+            },
+            {
+              "name": "count",
+              "value": "1"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [2912, 192],
+      "id": "8c59148d-c615-4543-b202-99b513581bef",
+      "name": "Image Generation"
+    },
+    {
+      "parameters": {
+        "jsCode": "function extractMedia(obj) {\n  if (!obj || typeof obj !== 'object') return [];\n  if (Array.isArray(obj)) return obj.flatMap(extractMedia);\n  if (obj.media && Array.isArray(obj.media)) return obj.media;\n  return Object.values(obj).flatMap(extractMedia);\n}\n\nlet allMedia = [];\nfor (const item of items) {\n  const found = extractMedia(item.json);\n  allMedia.push(...found);\n}\n\nconst unique = [];\nconst seen = new Set();\nfor (const media of allMedia) {\n  if (!media?.image?.generatedImage?.fifeUrl) continue;\n  if (!seen.has(media.name)) {\n    seen.add(media.name);\n    unique.push(media);\n  }\n}\n\nreturn unique.map(media => ({\n  json: {\n    mediaId: media.name || null,\n    prompt: media.image?.generatedImage?.prompt || null,\n    url: media.image?.generatedImage?.fifeUrl || null\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3088, 192],
+      "id": "9ea49c38-5e4a-4def-ac2a-6b66ca233581",
+      "name": "Parse Image Response"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [3264, 192],
+      "id": "bdbafe52-5ae5-4222-b2a8-432a74495638",
+      "name": "Download Featured Image"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://YOUR_WORDPRESS_SITE/wp-json/wp/v2/media",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Disposition",
+              "value": "attachment; filename=\"featured.jpg\""
+            },
+            {
+              "name": "Content-Type",
+              "value": "image/jpeg"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "name": "Upload Featured Image to WP",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [3440, 192],
+      "id": "12639baa-84c1-4d43-9586-17d2858580fb",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "YOUR_WP_BASIC_AUTH_CREDENTIAL_ID",
+          "name": "WordPress Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://YOUR_WORDPRESS_SITE/wp-json/wp/v2/posts/{{ $('Parse Pipeline Data').item.json.post.post_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"featured_media\": {{ $('Upload Featured Image to WP').item.json.id }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [3616, 192],
+      "id": "2bc30d23-6a51-4836-9cf4-a8baebe97fd4",
+      "name": "Set Featured Image",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "YOUR_WP_BASIC_AUTH_CREDENTIAL_ID",
+          "name": "WordPress Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://integrate.api.nvidia.com/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "text/event-stream"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"moonshotai/kimi-k2.5\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a senior marketing strategist and copywriter. Write conversion-focused, practitioner-level marketing content. Return ONLY valid raw JSON.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Generate structured marketing content for a blog post based on this summary:\\n\\n{{ $('Parse Pipeline Data').item.json.summary }}\\n\\nReturn a single valid JSON object with these keys:\\n\\n1. \\\"title_options\\\" — array of 5 blog title variations (3+ under 60 chars, use power words, numbers)\\n2. \\\"seo_descriptions\\\" — array of 3 meta descriptions (under 155 chars each)\\n3. \\\"blog_intro\\\" — 100-150 words intro string\\n4. \\\"social_posts\\\" — array of 3 strings (2 LinkedIn, 1 Twitter/X)\\n5. \\\"founder_hook\\\" — 2-sentence video hook\\n6. \\\"business_outcomes\\\" — array of 5 bullet points\\n7. \\\"positioning_statements\\\" — array of 3 statements\\n\\nReturn ONLY valid JSON. No markdown, no code fences.\"\n    }\n  ],\n  \"max_tokens\": 16384,\n  \"temperature\": 0.7,\n  \"top_p\": 1,\n  \"stream\": false\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [3792, 192],
+      "id": "b86e902d-36b4-498d-a60b-1627454c084e",
+      "name": "LLM - Marketing Content",
+      "retryOnFail": true,
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "YOUR_NVIDIA_BEARER_AUTH_ID",
+          "name": "Nvidia Bearer Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "folderId": "YOUR_GOOGLE_DRIVE_FOLDER_ID",
+        "title": "=Content Brief — {{ $now.toFormat('dd MMM yyyy') }} — {{ $('Parse Pipeline Data').item.json.slug }}"
+      },
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 2,
+      "position": [3968, 192],
+      "id": "14f2e269-33d8-4a14-93f0-af5a15a0fa6e",
+      "name": "Create Google Doc",
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "YOUR_GOOGLE_DOCS_CREDENTIAL_ID",
+          "name": "Google Docs Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $('LLM - Marketing Content').first().json;\nconst m = JSON.parse(raw.choices[0].message.content);\nconst post = $('Parse Pipeline Data').first().json;\nconst seo = $('RankReady — Analyze SEO').first().json;\n\nconst content = `CONTENT BRIEF — RANKREADY PIPELINE\nDate: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}\nBlog: ${post.post.post_url}\nSEO Score: ${seo.overall || 'N/A'}/10\n\n━━━━━━━━━━━━━━━━━━━━━━━━\nVIDEO HOOK\n━━━━━━━━━━━━━━━━━━━━━━━━\n${m.founder_hook}\n\n━━━━━━━━━━━━━━━━━━━━━━━━\nBEST BLOG TITLE\n━━━━━━━━━━━━━━━━━━━━━━━━\n${m.title_options[0]}\n\n━━━━━━━━━━━━━━━━━━━━━━━━\nSEO META DESCRIPTION\n━━━━━━━━━━━━━━━━━━━━━━━━\n${m.seo_descriptions[0]}\n\n━━━━━━━━━━━━━━━━━━━━━━━━\nLINKEDIN POST 1\n━━━━━━━━━━━━━━━━━━━━━━━━\n${m.social_posts[0]}\n\n━━━━━━━━━━━━━━━━━━━━━━━━\nLINKEDIN POST 2\n━━━━━━━━━━━━━━━━━━━━━━━━\n${m.social_posts[1]}\n\n━━━━━━━━━━━━━━━━━━━━━━━━\nTWITTER/X POST\n━━━━━━━━━━━━━━━━━━━━━━━━\n${m.social_posts[2]}\n\n━━━━━━━━━━━━━━━━━━━━━━━━\nBUSINESS OUTCOMES\n━━━━━━━━━━━━━━━━━━━━━━━━\n${m.business_outcomes.join('\\n')}\n\n━━━━━━━━━━━━━━━━━━━━━━━━\nPOSITIONING STATEMENTS\n━━━━━━━━━━━━━━━━━━━━━━━━\n${m.positioning_statements.join('\\n')}\n\n━━━━━━━━━━━━━━━━━━━━━━━━\nSEO ANALYSIS (via RankReady)\n━━━━━━━━━━━━━━━━━━━━━━━━\nOverall Score: ${seo.overall || 'N/A'}/10\nContent Quality: ${seo.scores?.contentQuality || 'N/A'}/10\nOn-Page SEO: ${seo.scores?.onPageSeo || 'N/A'}/10\nE-E-A-T: ${seo.scores?.eeat || 'N/A'}/10\nUser Experience: ${seo.scores?.userExperience || 'N/A'}/10\nWord Count: ${seo.wordCount || 'N/A'}\nKeyword Density: ${seo.keywordDensityPercent || 'N/A'}%`;\n\nreturn [{ json: { content } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [4144, 192],
+      "id": "1ef75266-0e7a-47b9-b09a-dc5f2178eb63",
+      "name": "Format Content Brief"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentURL": "={{ $('Create Google Doc').item.json.id }}",
+        "actionsUi": {
+          "actionFields": [
+            {
+              "action": "insert",
+              "locationChoice": "location",
+              "text": "={{ $json.content }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 2,
+      "position": [4320, 192],
+      "id": "5b5da7f1-e3f6-4920-a127-f0f58540294d",
+      "name": "Write Content Brief",
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "YOUR_GOOGLE_DOCS_CREDENTIAL_ID",
+          "name": "Google Docs Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Blog Ideas",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $('Get row(s) in sheet').item.json.row_number }}",
+            "Status": "Generated"
+          },
+          "matchingColumns": ["row_number"],
+          "schema": [
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [4496, 192],
+      "id": "bceb1355-f806-4955-a4d3-706ce69f4ac8",
+      "name": "Mark as Generated",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "userKey": "YOUR_PUSHOVER_USER_KEY",
+        "message": "=New Blog Post Published\n\nPost: {{ $('Parse Pipeline Data').item.json.post.post_url }}\nSEO Score: {{ $('RankReady — Analyze SEO').item.json.overall }}/10\nWord Count: {{ $('Parse Pipeline Data').item.json.wordCount }}\n\nContent Brief: https://docs.google.com/document/d/{{ $('Write Content Brief').item.json.documentId }}/edit\n\nCompleted: {{ $now.toFormat('dd MMM yyyy, HH:mm') }}",
+        "priority": 0,
+        "additionalFields": {
+          "html": true
+        }
+      },
+      "type": "n8n-nodes-base.pushover",
+      "typeVersion": 1,
+      "position": [4672, 192],
+      "id": "678e27e3-051e-4c47-a770-a28220b5fd13",
+      "name": "Push Notification",
+      "credentials": {
+        "pushoverApi": {
+          "id": "YOUR_PUSHOVER_CREDENTIAL_ID",
+          "name": "Pushover Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Phase 1: Content Generation via RankReady SaaS\nHTTP Request → POST https://rank-ready-sag.lovable.app/api/generate\nReturns SSE stream → Parse Response node collects into full HTML blog post\n",
+        "height": 300,
+        "width": 900
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [900, 80],
+      "typeVersion": 1,
+      "id": "sticky-phase1",
+      "name": "Sticky Note - Phase 1"
+    },
+    {
+      "parameters": {
+        "content": "## Phase 2: Mermaid Diagram Generation\nNvidia Kimi → Base64 → Render → Upload to WordPress\n",
+        "height": 256,
+        "width": 800
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [1430, 80],
+      "typeVersion": 1,
+      "id": "sticky-phase2",
+      "name": "Sticky Note - Phase 2"
+    },
+    {
+      "parameters": {
+        "content": "## Phase 3: Featured Image\nLLM Prompt → Image Gen API → Upload to WordPress\n",
+        "height": 256,
+        "width": 900
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [2660, 80],
+      "typeVersion": 1,
+      "id": "sticky-phase3",
+      "name": "Sticky Note - Phase 3"
+    },
+    {
+      "parameters": {
+        "content": "## Phase 4: Marketing Content + SEO Analysis\nMarketing via Nvidia Kimi | SEO via RankReady /api/analyze\nContent brief → Google Docs | Sheet update | Notification\n",
+        "height": 256,
+        "width": 1100
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [3720, 80],
+      "typeVersion": 1,
+      "id": "sticky-phase4",
+      "name": "Sticky Note - Phase 4"
+    }
+  ],
+  "connections": {
+    "Daily": {
+      "main": [
+        [{ "node": "Get row(s) in sheet", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [{ "node": "If Status Empty", "type": "main", "index": 0 }]
+      ]
+    },
+    "If Status Empty": {
+      "main": [
+        [{ "node": "Limit to 1", "type": "main", "index": 0 }]
+      ]
+    },
+    "Limit to 1": {
+      "main": [
+        [{ "node": "RankReady — Call API", "type": "main", "index": 0 }]
+      ]
+    },
+    "RankReady — Call API": {
+      "main": [
+        [{ "node": "RankReady — Parse Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "RankReady — Parse Response": {
+      "main": [
+        [{ "node": "Create WordPress Draft", "type": "main", "index": 0 }]
+      ]
+    },
+    "Create WordPress Draft": {
+      "main": [
+        [{ "node": "Parse Pipeline Data", "type": "main", "index": 0 }]
+      ]
+    },
+    "Parse Pipeline Data": {
+      "main": [
+        [
+          { "node": "LLM - Mermaid JS", "type": "main", "index": 0 },
+          { "node": "RankReady — Analyze SEO", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "LLM - Mermaid JS": {
+      "main": [
+        [{ "node": "Mermaid to Base64", "type": "main", "index": 0 }]
+      ]
+    },
+    "Mermaid to Base64": {
+      "main": [
+        [{ "node": "Render Diagram", "type": "main", "index": 0 }]
+      ]
+    },
+    "Render Diagram": {
+      "main": [
+        [{ "node": "Upload Diagram to WP", "type": "main", "index": 0 }]
+      ]
+    },
+    "Upload Diagram to WP": {
+      "main": [
+        [{ "node": "Get Post Content", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Post Content": {
+      "main": [
+        [{ "node": "Append Diagram to Post", "type": "main", "index": 0 }]
+      ]
+    },
+    "Append Diagram to Post": {
+      "main": [
+        [{ "node": "Update Post with Diagram", "type": "main", "index": 0 }]
+      ]
+    },
+    "Update Post with Diagram": {
+      "main": [
+        [{ "node": "LLM - Featured Image Prompt", "type": "main", "index": 0 }]
+      ]
+    },
+    "LLM - Featured Image Prompt": {
+      "main": [
+        [{ "node": "Image Generation", "type": "main", "index": 0 }]
+      ]
+    },
+    "Image Generation": {
+      "main": [
+        [{ "node": "Parse Image Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Parse Image Response": {
+      "main": [
+        [{ "node": "Download Featured Image", "type": "main", "index": 0 }]
+      ]
+    },
+    "Download Featured Image": {
+      "main": [
+        [{ "node": "Upload Featured Image to WP", "type": "main", "index": 0 }]
+      ]
+    },
+    "Upload Featured Image to WP": {
+      "main": [
+        [{ "node": "Set Featured Image", "type": "main", "index": 0 }]
+      ]
+    },
+    "Set Featured Image": {
+      "main": [
+        [{ "node": "LLM - Marketing Content", "type": "main", "index": 0 }]
+      ]
+    },
+    "LLM - Marketing Content": {
+      "main": [
+        [{ "node": "Create Google Doc", "type": "main", "index": 0 }]
+      ]
+    },
+    "Create Google Doc": {
+      "main": [
+        [{ "node": "Format Content Brief", "type": "main", "index": 0 }]
+      ]
+    },
+    "Format Content Brief": {
+      "main": [
+        [{ "node": "Write Content Brief", "type": "main", "index": 0 }]
+      ]
+    },
+    "Write Content Brief": {
+      "main": [
+        [{ "node": "Mark as Generated", "type": "main", "index": 0 }]
+      ]
+    },
+    "Mark as Generated": {
+      "main": [
+        [{ "node": "Push Notification", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}
